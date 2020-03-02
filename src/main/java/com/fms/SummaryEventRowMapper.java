@@ -5,8 +5,7 @@ import org.springframework.batch.item.excel.support.rowset.RowSet;
  
 public class SummaryEventRowMapper implements RowMapper<EventSummaryEntity> {
  
-	@Override
-    public EventSummaryEntity mapRow(RowSet rowSet) throws Exception {
+	public EventSummaryEntity mapRow(RowSet rowSet) throws Exception {
     	EventSummaryEntity eventSummary = new EventSummaryEntity();
     	eventSummary.setEvent_Id(rowSet.getColumnValue(0));
     	eventSummary.setMonth(rowSet.getColumnValue(1));

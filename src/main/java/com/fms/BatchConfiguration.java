@@ -2,14 +2,19 @@
 package com.fms;
 
 import java.io.File;
+import java.util.Date;
 
 import javax.sql.DataSource;
 
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
@@ -22,16 +27,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-
-//**Added today 02/03/2020
-import org.springframework.batch.core.launch.support.SimpleJobLauncher;
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobParameters;
-import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
 @Configuration
 @EnableBatchProcessing
+@EnableScheduling
 public class BatchConfiguration {
 
 	@Autowired
@@ -43,9 +44,9 @@ public class BatchConfiguration {
 	@Autowired
 	public DataSource dataSource;
 	
-	//**Added today 02/03/2020
+	
 	@Autowired
-	private SimpleJobLauncher jobLauncher;
+    JobLauncher jobLauncher;
 
 	@Autowired
 	private Environment environment;
@@ -140,14 +141,12 @@ public class BatchConfiguration {
 		return jobBuilderFactory.get("importSummaryJob").incrementer(new RunIdIncrementer()).flow(step1()).end().build();
 	}
 	
-	//**Added today 02/03/2020
-	@Scheduled(cron = "*/5 * * * * *")
+	@Scheduled(cron = "* */10 * * * *")
 	public void perform() throws Exception {
 
 		System.out.println("Job Started at :" + new Date());
 		JobParameters param = new JobParametersBuilder().addString("JobID", String.valueOf(System.currentTimeMillis()))
 				.toJobParameters();
-
 		JobExecution execution = jobLauncher.run(importSummaryJob(), param);
 
 		System.out.println("Job finished with status :" + execution.getStatus());
