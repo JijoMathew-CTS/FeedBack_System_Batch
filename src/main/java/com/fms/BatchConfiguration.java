@@ -23,6 +23,13 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
+//**Added today 02/03/2020
+import org.springframework.batch.core.launch.support.SimpleJobLauncher;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.scheduling.annotation.Scheduled;
+
 @Configuration
 @EnableBatchProcessing
 public class BatchConfiguration {
@@ -35,6 +42,10 @@ public class BatchConfiguration {
 
 	@Autowired
 	public DataSource dataSource;
+	
+	//**Added today 02/03/2020
+	@Autowired
+	private SimpleJobLauncher jobLauncher;
 
 	@Autowired
 	private Environment environment;
@@ -129,6 +140,17 @@ public class BatchConfiguration {
 		return jobBuilderFactory.get("importSummaryJob").incrementer(new RunIdIncrementer()).flow(step1()).end().build();
 	}
 	
-	 
+	//**Added today 02/03/2020
+	@Scheduled(cron = "*/5 * * * * *")
+	public void perform() throws Exception {
+
+		System.out.println("Job Started at :" + new Date());
+		JobParameters param = new JobParametersBuilder().addString("JobID", String.valueOf(System.currentTimeMillis()))
+				.toJobParameters();
+
+		JobExecution execution = jobLauncher.run(importSummaryJob(), param);
+
+		System.out.println("Job finished with status :" + execution.getStatus());
+	}
 
 }
