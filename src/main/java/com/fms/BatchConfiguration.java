@@ -22,8 +22,10 @@ import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.excel.RowMapper;
 import org.springframework.batch.item.excel.poi.PoiItemReader;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -33,7 +35,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 @Configuration
 @EnableBatchProcessing
 @EnableScheduling
-public class BatchConfiguration {
+//@PropertySource(value = { "classpath:application.properties" }, ignoreResourceNotFound = false)
+public class BatchConfiguration
+//implements EnvironmentAware 
+{
 
 	@Autowired
 	public JobBuilderFactory jobBuilderFactory;
@@ -50,11 +55,12 @@ public class BatchConfiguration {
 
 	@Autowired
 	private Environment environment;
+	
 
 	@Bean
 	public DataSource dataSource() {
 		final DriverManagerDataSource dataSource = new DriverManagerDataSource();
-		//environment.getProperty("datasource.driver-class-name")
+		//environment.getProperty("datasource.driver-class-name");
 		dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
 		//environment.getProperty("datasource.url")
 		dataSource.setUrl("jdbc:mysql://localhost:3306/outreachfeedback");
@@ -66,54 +72,23 @@ public class BatchConfiguration {
 		return dataSource;
 	}
 	
-	/*
-	 * @Bean public FlatFileItemReader<User> reader(){ FlatFileItemReader<User>
-	 * reader = new FlatFileItemReader<User>(); reader.setResource(new
-	 * ClassPathResource("users.csv")); reader.setLineMapper(new
-	 * DefaultLineMapper<User>() {{ setLineTokenizer(new DelimitedLineTokenizer() {{
-	 * setNames(new String[] { "name" }); }}); setFieldSetMapper(new
-	 * BeanWrapperFieldSetMapper<User>() {{ setTargetType(User.class); }});
-	 * 
-	 * }});
-	 * 
-	 * return reader; }
-	 * 
-	 * @Bean public UserItemProcessor processor(){ return new UserItemProcessor(); }
-	 * 
-	 * @Bean public JdbcBatchItemWriter<User> writer(){ JdbcBatchItemWriter<User>
-	 * writer = new JdbcBatchItemWriter<User>();
-	 * writer.setItemSqlParameterSourceProvider(new
-	 * BeanPropertyItemSqlParameterSourceProvider<User>());
-	 * writer.setSql("INSERT INTO outreachfeedback.user(name) VALUES (:name)");
-	 * writer.setDataSource(dataSource);
-	 * 
-	 * return writer; }
-	 * 
-	 * @Bean public Step step1() { return stepBuilderFactory.get("step1").<User,
-	 * User> chunk(3) .reader(reader()) .processor(processor()) .writer(writer())
-	 * .build(); }
-	 * 
-	 * @Bean public Job importUserJob() { return
-	 * jobBuilderFactory.get("importUserJob") .incrementer(new RunIdIncrementer())
-	 * .flow(step1()) .end() .build(); }
-	 */
 
 	
 	@Bean
-	ItemReader<EventSummaryEntity> reader() {
+	ItemReader<EventSummaryEntity> eventSummaryReader() {
 		PoiItemReader<EventSummaryEntity> reader = new PoiItemReader();
 		reader.setLinesToSkip(1);
 		reader.setResource(new FileSystemResource(new File("C:/excel/input/" + "Outreach_Events_Summary.xlsx")));
-		reader.setRowMapper(excelRowMapper());
+		reader.setRowMapper(eventSummaryRowMapper());
 		return reader;
 	}
 
-	RowMapper<EventSummaryEntity> excelRowMapper() {
+	RowMapper<EventSummaryEntity> eventSummaryRowMapper() {
 		return new SummaryEventRowMapper();
 	}
 
 	@Bean
-	public JdbcBatchItemWriter<EventSummaryEntity> writer() {
+	public JdbcBatchItemWriter<EventSummaryEntity> eventSummaryWriter() {
 		JdbcBatchItemWriter<EventSummaryEntity> writer = new JdbcBatchItemWriter<EventSummaryEntity>();
 		writer.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<EventSummaryEntity>());
 		String sql = "insert into event_summary(event_id,poc_id,poc_name,month,base_location,beneficiary_name,venue_address) "
@@ -126,23 +101,23 @@ public class BatchConfiguration {
 	}
 
 	@Bean
-	public SummaryItemProcessor processor() {
+	public SummaryItemProcessor summaryProcessor() {
 		return new SummaryItemProcessor();
 	}
 
-	@Bean
+	@Bean(name="summaryStep1")
 	public Step step1() {
-		return stepBuilderFactory.get("step1").<EventSummaryEntity, EventSummaryEntity>chunk(3).reader(reader())
-				.processor(processor()).writer(writer()).build();
+		return stepBuilderFactory.get("summaryStep1").<EventSummaryEntity, EventSummaryEntity>chunk(3).reader(eventSummaryReader())
+				.processor(summaryProcessor()).writer(eventSummaryWriter()).build();
 	}
 
-	@Bean
+	@Bean(name="importSummaryJob")
 	public Job importSummaryJob() {
 		return jobBuilderFactory.get("importSummaryJob").incrementer(new RunIdIncrementer()).flow(step1()).end().build();
 	}
 	
 	@Scheduled(cron = "* */10 * * * *")
-	public void perform() throws Exception {
+	public void performImportSummary() throws Exception {
 
 		System.out.println("Job Started at :" + new Date());
 		JobParameters param = new JobParametersBuilder().addString("JobID", String.valueOf(System.currentTimeMillis()))
@@ -151,5 +126,65 @@ public class BatchConfiguration {
 
 		System.out.println("Job finished with status :" + execution.getStatus());
 	}
+	
+	
+
+	@Bean
+	ItemReader<VolunteerNotAttended> enrollmentNotAttendedReader() {
+		PoiItemReader<VolunteerNotAttended> reader = new PoiItemReader();
+		reader.setLinesToSkip(1);
+		reader.setResource(new FileSystemResource(new File("C:/excel/input/" + "Volunteer_Enorrlement_Details_Not_Attend.xlsx")));
+		reader.setRowMapper(enrollmentNotAttendedRowMapper());
+		return reader;
+	}
+
+	RowMapper<VolunteerNotAttended> enrollmentNotAttendedRowMapper() {
+		return new NotAttendedEventRowMapper();
+	}
+
+	@Bean
+	public JdbcBatchItemWriter<VolunteerNotAttended> enrollmentNotAttendedWriter() {
+		JdbcBatchItemWriter<VolunteerNotAttended> writer = new JdbcBatchItemWriter<VolunteerNotAttended>();
+		writer.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<VolunteerNotAttended>());
+		String sql = "insert into vol_event_not_attended(event_id,employee_id,base_location,beneficiary_name,event_name,employee_name,email_status,month,council_name,event_date) "
+				+ "values(:eventId,:employeeId,:baseLocation,:beneficiaryName,:eventName,:employeeName,:emailStatus,:month,:councilName,:eventDate)";
+
+		writer.setSql(sql);
+		writer.setDataSource(dataSource);
+
+		return writer;
+	}
+
+	@Bean
+	public NotAttendedItemProcessor enrollmentNotAttendedProcessor() {
+		return new NotAttendedItemProcessor();
+	}
+
+	@Bean(name="enrollmentNotAttendedStep1")
+	public Step enrollmentNotAttendedStep1() {
+		return stepBuilderFactory.get("enrollmentNotAttendedStep1").<VolunteerNotAttended, VolunteerNotAttended>chunk(3).reader(enrollmentNotAttendedReader())
+				.processor(enrollmentNotAttendedProcessor()).writer(enrollmentNotAttendedWriter()).build();
+	}
+
+	@Bean(name="enrollmentNotAttendedJob")
+	public Job enrollmentNotAttendedJob() {
+		return jobBuilderFactory.get("enrollmentNotAttendedJob").incrementer(new RunIdIncrementer()).flow(enrollmentNotAttendedStep1()).end().build();
+	}
+	
+	@Scheduled(cron = "*/10 * * * * *")
+	public void performEnrollmentNotAttended() throws Exception {
+
+		System.out.println("Job Started at :" + new Date());
+		JobParameters param = new JobParametersBuilder().addString("JobID", String.valueOf(System.currentTimeMillis()))
+				.toJobParameters();
+		JobExecution execution = jobLauncher.run(importSummaryJob(), param);
+
+		System.out.println("Job finished with status :" + execution.getStatus());
+	}
+
+
+
+	
+	
 
 }
